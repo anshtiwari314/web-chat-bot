@@ -35,27 +35,30 @@ function ChatWindow(props) {
 	const [textAreaInput, setTextAreaInput] = useLocalStorage('textAreaInput', false);
 	//ScrollTo 1st recieved Box after we recieve msg
 	const [scrollTo, setScrollTo] = useLocalStorage('scrollTo', 0);
-	//Maximize ChatBot using maximize icon state change of class
+	//Maximize ChatBot using maximize icon state change of className
 	const [maximizeChatBot, setMaximizeChatBot] = useLocalStorage('maximizeChatBot', "");
 	//change maximize or minimize icon of chatbot
 	const [maxOrMinIcon, setMaxOrMinIcon] = useLocalStorage('maxOrMinIcon', "/images/maximize.png");
 	//Escape Button click
-	const [escapeButton, setEscapeButton] = useLocalStorage('escapeButton', false)
+	const [escapeButton, setEscapeButton] = useLocalStorage('escapeButton', false);
 
 	const allStateKeys = ['value', 'buttonValue', 'newsValue', 'loader', 'jcb_down_button_data', 'sheet', 'conversation_id', 'textAreaInput', 'scrollTo', 'maximizeChatBot', 'maxOrMinIcon', 'escapeButton', 'activeTabs'];
 
 	const tabId = sessionStorage.getItem('_jcb_tabId') ? sessionStorage.getItem('_jcb_tabId') : uuid();
 
+	const query = useRef("")
 	/**using Escape button to make downbuttonList disappear*/
 	useEffect(() => {
+		//console.log('handleEsc restted')
 		const handleEsc = (event) => {
 			if (event.keyCode === 27) {
+				
 				setBottomSheet({ bottomSheet: false })
 				setEscapeButton(escapeButton => { return !escapeButton })
 			}
 		};
 		window.addEventListener('keydown', handleEsc);
-
+		return ()=>window.removeEventListener('keydown',handleEsc)
 	}, []);
 	/** */
 
@@ -71,7 +74,7 @@ function ChatWindow(props) {
 			if(activeTabs.length > 0) {
 				localStorage.setItem('_jcb_activeTabs', JSON.stringify(activeTabs));
 			} else {
-				clearFromLocalStorage(allStateKeys);
+			clearFromLocalStorage(allStateKeys);
 			}
 		});
 	}, []);
@@ -115,6 +118,7 @@ function ChatWindow(props) {
 
 	/** when user presses any message UI button*/
 	function onclick(event) {
+		console.log("onclick event triggred",getSessionId())
 		payload = {
 			session: getSessionId(),
 			query: event,
@@ -137,24 +141,24 @@ function ChatWindow(props) {
 		// console.log("type:" + m.type + " pos:" + i);
 		if (m.query !== "") {
 			if (m.type == "receive") {
-				return <Receive key={i} query={m.query} time={m.time} />;
+				return <Receive key={i*43} query={m.query} time={m.time} />;
 
 			} else if (m.type == "sent") {
 				if (i === scrollTo) {
-					return <>
+					return <React.Fragment key={i*43} >
 						<div ref={messagesEndRef2} />
-						<Send key={i} query={m.query} time={m.time} />
+						<Send query={m.query} time={m.time} />
 
 						{messagesEndRef2.current ? messagesEndRef2.current.scrollIntoView({ behavior: "smooth" }) : null}
-					</>
+					</React.Fragment>
 				}
 				return <Send key={i} query={m.query} time={m.time} />;
 			}
 			else if (m.type === "card") {
-				return <Table key={i} query={m.query} time={m.time} tableClick={(m) => { tableHyperLinkClick(m) }} />;
+				return <Table key={i*43} query={m.query} time={m.time} tableClick={(m) => { tableHyperLinkClick(m) }} />;
 			}
 			else if (m.type === "image") {
-				return <Image_message link={m.query} />
+				return <Image_message link={m.query} key={i*43}/>
 			}
 		} else {
 			return null;
@@ -167,7 +171,7 @@ function ChatWindow(props) {
 		if (m.type == "button") {
 			return (
 				<ButtonMessage
-					key={i}
+					key={i*49}
 					query={m.query}
 					click={() => {
 						onclick(m.query);
@@ -181,7 +185,7 @@ function ChatWindow(props) {
 	/*OnChange in Input  function to get the value from input*/
 	var payload = {
 		session: getSessionId(),
-		query: "",
+		query: query.current,
 		type: "sent",
 		time: startTime(),
 		count: value.length,
@@ -191,6 +195,7 @@ function ChatWindow(props) {
 
 	/**when we write something on input field, event function will change the value constantly */
 	function submitForm(event) {
+		query.current = event;
 		payload = {
 			session: getSessionId(),
 			query: event,
@@ -213,7 +218,9 @@ function ChatWindow(props) {
 				localStorage.setItem('_jcb_activeTabs', JSON.stringify([...activeTabs, tabId]))
 			}
 		}
-		if(conversation_id !== -1) return true;
+		// if(conversation_id !== -1) 
+		// 	return true;
+		
 		if(window.location.pathname === "/mf-transaction/Category") {
 			setTimeout(initializeChat, 10000);
 		} else {
@@ -222,8 +229,16 @@ function ChatWindow(props) {
 	}, []);
 
 	function getSessionId() {
-		var user = Cookies.get(props.cookieKey);
+		let user 
+		if(props.localKey){
+			 user = localStorage.getItem(props.localKey)
+		}else {
+			 user = Cookies.get(props.cookieKey)
+		}
+		
+		//console.log("just for testing",props,props.localKey,user)
 		return user ? user : -1;
+		
 	}
 
 	function initializeChat() {
@@ -306,7 +321,7 @@ function ChatWindow(props) {
 			})
 			.catch((error) => {
 				var errors = "";
-				if (error.message.includes("Network")) errors = "There seems to be an issue with your internet connection. Please check."
+				if (error.message.includes("Network")) errors = "There's a technical issue. Please check back in some time."
 				else errors = "Oops! please Please write something..."
 				var inital_message = {
 					session: getSessionId(),
@@ -328,12 +343,13 @@ function ChatWindow(props) {
 	}
 
 	function isClicked(bool) {
+		//console.log('is clicked function clicked')
 		setScrollTo(value.length);
 
 		setBottomSheet({ bottomSheet: false });
 		setLoader(1);
 		var count = 1;
-		console.log("isClicked: request: ");
+		console.log("isClicked: request: ",payload);
 		console.log(payload);
 		if (
 			payload.query.toString().trim() === undefined ||
@@ -341,7 +357,7 @@ function ChatWindow(props) {
 			payload.query.toString().trim() === ""
 		) {
 			console.log(
-				"isClicked: query is blank, please enter something in textarea"
+				"isClicked: query is blank, please enter something in textarea",payload
 			);
 			setLoader(-1);
 		} else {
@@ -468,7 +484,7 @@ function ChatWindow(props) {
 					/**If we get 500 Internal error. then we will show this query. */
 					var errors = "";
 					// console.log(error.message)
-					if (error.message.includes("Network")) errors = "There seems to be an issue with your internet connection. Please check."
+					if (error.message.includes("Network")) errors = "There's a technical issue. Please check back in some time."
 					else errors = "Oops! please Enter something related to Finance!"
 					var inital_message = {
 						session: getSessionId(),
@@ -517,6 +533,7 @@ function ChatWindow(props) {
 	var downbuttons = jcb_down_button_data.map((m, i) => {
 		return (
 			<button
+				key={i *313}
 				className="jcb_bottom-sheet-item"
 				onClick={() => {
 					onclick(m);
@@ -553,18 +570,18 @@ function ChatWindow(props) {
 
 	/**Return Type */
 	return (
-		<div class={"jcb " + maximizeChatBot}>
-			<div class="jcb_blackScreenShadow_chatBot"></div>
+		<div className={"jcb " + maximizeChatBot} >
+			<div className="jcb_blackScreenShadow_chatBot"></div>
 			<div
-				className="jcb_chat-window jcb_chatbotAnimationClassFadeIn"
+				className="jcb_chat-window jcb_chatbotAnimationclassNameFadeIn"
 				id="jcb_chatBot-id"
 				style={{ display: props.active ? "block" : "none" }}
 			>
 				<div className="jcb_panel-default">
 					<div className="jcb_panel-logo-wrapper">
 						<div style={{ textAlign: "right" }} className="jcb_action-btn">
-							<img alt="maximize_icon" class="jcb_maximize-icon-heading-chatbot" onClick={(m) => { m.preventDefault(); onMaximizeChatBot(); }} src={maxOrMinIcon} />
-							<img alt="close_icon" style={{ cursor: "pointer" }} class="close-icon-heading-chatbot" onClick={(m) => {
+							<img alt="maximize_icon" className="jcb_maximize-icon-heading-chatbot" onClick={(m) => { m.preventDefault(); onMaximizeChatBot(); }} src={maxOrMinIcon} />
+							<img alt="close_icon" style={{ cursor: "pointer" }} className="close-icon-heading-chatbot" onClick={(m) => {
 								m.preventDefault();
 								setMaximizeChatBot(""); props.closeChatbot(); setBottomSheet({ bottomSheet: false })
 							}} src="/images/remove.png" />
@@ -585,7 +602,7 @@ function ChatWindow(props) {
 						
 						{loader !== -1 ? <div className="jcb_loader_animation_chatbot"><Dot>.</Dot><Dot>.</Dot><Dot>.</Dot> </div> : null}
 						{recievesButton.length !== 0 ? <div className="row jcb_msg_container ">
-							<div class="jcb_btn_messs">{recievesButton}</div>
+							<div className="jcb_btn_messs">{recievesButton}</div>
 						</div> : null}
 						<div ref={messagesEndRef} />
 

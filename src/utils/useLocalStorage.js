@@ -36,6 +36,7 @@ export default function useLocalStorage(key, defaultValue) {
 
   useEffect(() => {
 		window.addEventListener('storage', (e) => {
+      console.log(`storage for ${key} ${e.key}triggered`)
       if(keyWithPrefix(key) === e.key){
         setValue(JSON.parse(e.newValue))
       }
